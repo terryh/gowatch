@@ -15,27 +15,23 @@ import (
 )
 
 func main() {
-	watchDog1, err := gowatch.NewWatcher("tcp", "www.google.com.tw:80", time.Second*5)
-	watchDog2, err := gowatch.NewWatcher("tcp", "localhost:3000", time.Second*1)
+	watcher := gowatch.NewWatcher()
 
-	fmt.Println(watchDog1, err)
-	fmt.Println(watchDog2, err)
+	watcher.Append("tcp", "www.google.com.tw:80", time.Second*5)
+	watcher.Append("tcp", "localhost:3000", time.Second*1)
 
 	//select {}
 	for {
 
 		select {
 
-		case msg := <-watchDog1.Status:
-			fmt.Println("watchDog1", msg)
-		case msg := <-watchDog2.Status:
-			fmt.Println("watchDog2", msg)
+		case node := <-watcher.WatchChan:
+			fmt.Println("watcher", node.s)
 		}
 
 	}
 
 }
-
 ```
 
 

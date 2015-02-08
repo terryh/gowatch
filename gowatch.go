@@ -6,56 +6,90 @@ import (
 	"time"
 )
 
-const (
-	OK = "OK"
-)
-
+// Watcher able to watch a lot
 type Watcher struct {
-	HostAddress string
-	Protocol    string
-	Status      chan string
-
-	interval   time.Duration
-	ticker     *time.Ticker
-	lastStatus string
-	stop       chan bool
+	WatchChan chan *WatchNode
+	Nodes     []*WatchNode
 }
 
-func NewWatcher(protocol, hostAddress string, duration time.Duration) (*Watcher, error) {
+// WatchNode for Watcher
+type WatchNode struct {
+	Watcher     *Watcher
+	Name        string
+	Group       string
+	HostAddress string
+	Protocol    string
+
+	interval time.Duration
+	ticker   *time.Ticker
+	Status   string
+	stop     bool
+}
+
+// NewWatcher return the new Watcher
+func NewWatcher() *Watcher {
+	w := new(Watcher)
+	w.WatchChan = make(chan *WatchNode)
+	return w
+}
+
+// Append append the new node to Watcher
+// protocol support tcp or udp
+// hostAddress is like localhost:3000
+// duration simple put time.Duration you would like to pool
+func (w *Watcher) Append(protocol, hostAddress string, duration time.Duration) error {
+	_, err := NewWatchNode(protocol, hostAddress, duration, w)
+	return err
+}
+
+//NewWatchNode you could specific the Watcher
+func NewWatchNode(protocol, hostAddress string, duration time.Duration, w *Watcher) (*WatchNode, error) {
 
 	if protocol != "tcp" && protocol != "udp" {
 		return nil, errors.New("protocol must be tcp or udp")
 	}
 
-	watch := new(Watcher)
+	node := new(WatchNode)
 
-	watch.HostAddress = hostAddress
-	watch.Protocol = protocol
-	watch.Status = make(chan string)
+	node.HostAddress = hostAddress
+	node.Protocol = protocol
+	if w != nil {
+		node.Watcher = w
+	}
 
-	watch.ticker = time.NewTicker(duration)
-	watch.interval = duration
-	watch.stop = make(chan bool)
-	watch.Run()
-	return watch, nil
+	node.ticker = time.NewTicker(duration)
+	node.interval = duration
+	node.stop = true
+	node.Start()
+
+	w.Nodes = append(w.Nodes, node)
+	return node, nil
 }
 
-func (w *Watcher) Run() {
+// Start will kick the time.Ticker start to watch the node
+// when the status of the node change wouldi send  notify to Watcher.WatchChan
+func (node *WatchNode) Start() {
 	go func() {
-		for _ = range w.ticker.C {
-			_, err := net.Dial(w.Protocol, w.HostAddress)
+		for _ = range node.ticker.C {
+			_, err := net.Dial(node.Protocol, node.HostAddress)
 			if err != nil {
-				w.lastStatus = err.Error()
-				w.Status <- w.lastStatus
-			} else if w.lastStatus != "" {
-				w.lastStatus = ""
-				w.Status <- OK
+				// bad news
+				// this bad news different from previous one
+				if node.Status != err.Error() {
+					node.Status = err.Error()
+					node.Watcher.WatchChan <- node
+				}
+			} else if node.Status != "" {
+				// no news is good news
+				node.Status = ""
+				node.Watcher.WatchChan <- node
 			}
-			//fmt.Println("Tick at", t, w.HostAddress, con, err)
+			//fmt.Println("Tick at", time.Now(), node.HostAddress, err)
 		}
 	}()
 }
 
-func (w *Watcher) Stop() {
-	w.ticker.Stop()
+// Stop ask the WatchNode ticker to stop
+func (node *WatchNode) Stop() {
+	node.ticker.Stop()
 }
