@@ -22,11 +22,9 @@ func main() {
 
 	//select {}
 	for {
-
 		select {
-
-		case node := <-watcher.WatchChan:
-			fmt.Println("watcher", node.s)
+		    case node := <-watcher.WatchChan:
+			    fmt.Println("watcher", node.s)
 		}
 
 	}
