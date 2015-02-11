@@ -24,7 +24,7 @@ func main() {
 	for {
 		select {
 		    case node := <-watcher.WatchChan:
-			    fmt.Println("watcher", node.s)
+			    fmt.Println("watcher", node.Status)
 		}
 
 	}
